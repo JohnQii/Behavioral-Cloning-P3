@@ -29,6 +29,12 @@ The goals / steps of this project are the following:
 ## Rubric Points
 ### Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/432/view) individually and describe how I addressed each point in my implementation.  
 
+How to run the project:
+0. run the simulator-linux and choose the TRAIN MODE, then usave the model to 'model.h5'
+1. source activate (carnd-term1) 
+2. python drive.py model.h5
+3. run the simulator-linux and choose the AUTONOMOUS MODE
+4. Enjoy it or ...  destory it ? 
 ---
 ### Files Submitted & Code Quality
 
