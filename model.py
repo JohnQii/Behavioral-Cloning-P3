@@ -70,6 +70,21 @@ def LenetTest():
     model.fit(X_train, y_train, validation_split= 0.2, shuffle=True, nb_epoch=2) #default epoch= 10
     model.save('model.h5')
 
+#not use
+def getImagesMeasures(path, line, i, correction):
+    """Return the image and measurement which is center or left or right """
+    name = path + 'IMG/' + line[0].split('/')[-1]
+    orgin = cv2.imread(name)
+    image = cv2.cvtColor(orgin, cv2.COLOR_BGR2RGB)
+    measurement = float(line[3])
+    if i==1:
+        return (image, measurement + correction)
+    elif i==2:
+        return (image, measurement - correction)
+    else:
+        return(image, measurement)
+
+
 def getLines(path):
     """Get the lines from driving_log.csv and return the lines."""
     lines = []
@@ -99,6 +114,11 @@ def getPathAngle(lines, path, correction):
     return (images_path, measurements)
 
 def flipImages(images_paths, angles):
+    """
+    :param images_paths: the path from driving_log.csv
+    :param angles: the angles from driving_log.csv
+    :return: double the images_path and angles.
+    """
     length = len(images_paths)
     flips = []
     for i in range(length):
@@ -109,21 +129,8 @@ def flipImages(images_paths, angles):
         flips.append(1)
     return (images_paths, angles, flips )
 
-
-def getImagesMeasures(path, line, i, correction):
-    """Return the image and measurement which is center or left or right"""
-    name = path + 'IMG/' + line[0].split('/')[-1]
-    orgin = cv2.imread(name)
-    image = cv2.cvtColor(orgin, cv2.COLOR_BGR2RGB)
-    measurement = float(line[3])
-    if i==1:
-        return (image, measurement + correction)
-    elif i==2:
-        return (image, measurement - correction)
-    else:
-        return(image, measurement)
-
 def generator(samples, batch_size=32):
+    """Generator the data"""
     num_samples = len(samples)
     while 1: # Loop forever so the generator never terminates
         shuffle(samples)
@@ -140,30 +147,6 @@ def generator(samples, batch_size=32):
                 else:
                     images.append(image)
                 angles.append(angle)
-
-                # for i in range (3):
-                    # image, angle = getImagesMeasures(path, batch_sample, i,correction)
-                    # images.append(image)
-                    # images.append(cv2.flip(image, 1))
-                    # angles.append(angle)
-                    # angles.append(angle*(-1))
-                # name = path + batch_sample[0].split('/')[-1]
-                # center_image = cv2.imread(name)
-                # center_angle = float(batch_sample[3])
-                # images.append(center_image)
-                # images.append(cv2.flip(center_image, 1))
-                # angles.append(center_angle)
-
-                # for i in range (3):
-                #     name = path + batch_sample[i].split('/')[-1]
-                #     image = cv2.imread(name)
-                #     angle = float(batch_sample[3])
-                #     if i == 2:
-                #         angle -= correction
-                #     elif i == 1:
-                #         angle += correction
-                #     images.append(image)
-                #     angles.append(angle)
 
             # trim image to only see section with road
             X_train = np.array(images)
@@ -221,7 +204,7 @@ def NVIDIATrain():
                         validation_data = validation_generator,
                         nb_val_samples = len(X_valid),
                         nb_epoch = 2)
-    model.save('model.h5')
+    model.save('model2.h5')
     ### print the keys contained in the history object
     print(history_object.history.keys())
 
