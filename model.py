@@ -11,19 +11,17 @@ from keras.layers.pooling import MaxPooling2D
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
-#import the data from the csv file
-lines = []
-with open('./data/driving_log.csv') as csvfile:
-    reader = csv.reader(csvfile)
-    for line in reader:
-        lines.append(line)
-
-#From classroom test, not use it after test.
+# LenetTest()
 def LenetTest():
-    """The Lenet from class videos"""
+    """The Lenet from class videos. not use it after test"""
     images = []
     measurements = []
     path = './data/IMG/'
+    lines = []
+    with open(path + '/driving_log.csv') as csvfile:
+        reader = csv.reader(csvfile)
+        for line in reader:
+            lines.append(line)
     for line in lines:
             image_center = cv2.imread(path + line[0].split('/')[-1])
             image_left = cv2.imread(path + line[0].split('/')[-1])
@@ -72,11 +70,60 @@ def LenetTest():
     model.fit(X_train, y_train, validation_split= 0.2, shuffle=True, nb_epoch=2) #default epoch= 10
     model.save('model.h5')
 
-# LenetTest()
+def getLines(path):
+    """Get the lines from driving_log.csv and return the lines."""
+    lines = []
+    with open(path + 'driving_log.csv') as csvfile:
+        reader = csv.reader(csvfile)
+        for line in reader:
+            lines.append(line)
+    return lines
+
+def getPathAngle(lines, path, correction):
+    """
+    :param lines: lines which from .csv
+    :param path: data path
+    :param correction: correction for the leaft and right camera
+    :return: the path and angles from the lines
+    """
+    images_path = []
+    measurements = []
+    for line in lines:
+        images_path.append(path + 'IMG/' + line[0].split('/')[-1])
+        images_path.append(path + 'IMG/' + line[1].split('/')[-1])
+        images_path.append(path + 'IMG/' + line[2].split('/')[-1])
+        angle = float(line[3])
+        measurements.append(angle)
+        measurements.append(angle + correction)
+        measurements.append(angle - correction)
+    return (images_path, measurements)
+
+def flipImages(images_paths, angles):
+    length = len(images_paths)
+    flips = []
+    for i in range(length):
+        flips.append(0)
+    for i in range (length):
+        images_paths.append(images_paths[i])
+        angles.append(angles[i]*(-1))
+        flips.append(1)
+    return (images_paths, angles, flips )
 
 
-#Generators
-def generator(samples, batch_size=128, path = './data/IMG/', correction = 0.05):
+def getImagesMeasures(path, line, i, correction):
+    """Return the image and measurement which is center or left or right"""
+    name = path + 'IMG/' + line[0].split('/')[-1]
+    orgin = cv2.imread(name)
+    image = cv2.cvtColor(orgin, cv2.COLOR_BGR2RGB)
+    measurement = float(line[3])
+    if i==1:
+        return (image, measurement + correction)
+    elif i==2:
+        return (image, measurement - correction)
+    else:
+        return(image, measurement)
+
+def generator(samples, batch_size=32):
     num_samples = len(samples)
     while 1: # Loop forever so the generator never terminates
         shuffle(samples)
@@ -85,64 +132,84 @@ def generator(samples, batch_size=128, path = './data/IMG/', correction = 0.05):
 
             images = []
             angles = []
-            for batch_sample in batch_samples:
+            for imagepath,angle, isflip in batch_samples:
+                orgin = cv2.imread(imagepath)
+                image = cv2.cvtColor(orgin, cv2.COLOR_BGR2RGB)
+                if isflip:
+                    images.append(cv2.flip(image, 1))
+                else:
+                    images.append(image)
+                angles.append(angle)
+
+                # for i in range (3):
+                    # image, angle = getImagesMeasures(path, batch_sample, i,correction)
+                    # images.append(image)
+                    # images.append(cv2.flip(image, 1))
+                    # angles.append(angle)
+                    # angles.append(angle*(-1))
                 # name = path + batch_sample[0].split('/')[-1]
                 # center_image = cv2.imread(name)
                 # center_angle = float(batch_sample[3])
                 # images.append(center_image)
+                # images.append(cv2.flip(center_image, 1))
                 # angles.append(center_angle)
-                for i in range (3):
-                    name = path + batch_sample[i].split('/')[-1]
-                    image = cv2.imread(name)
-                    angle = float(batch_sample[3])
-                    if i == 2:
-                        angle -= correction
-                    elif i == 1:
-                        angle += correction
-                    images.append(image)
-                    angles.append(angle)
+
+                # for i in range (3):
+                #     name = path + batch_sample[i].split('/')[-1]
+                #     image = cv2.imread(name)
+                #     angle = float(batch_sample[3])
+                #     if i == 2:
+                #         angle -= correction
+                #     elif i == 1:
+                #         angle += correction
+                #     images.append(image)
+                #     angles.append(angle)
 
             # trim image to only see section with road
             X_train = np.array(images)
             y_train = np.array(angles)
             yield shuffle(X_train, y_train)
 
-def conv2d_BN(input_x, filters, rows, cols, border_mode='same', strides=(1, 1)):
-    """ Convolution2D and BatchNormalization
-    """
-    input_x = Convolution2D(filters, rows, cols, activation='relu', subsample=strides,
-                            border_mode=border_mode)(input_x)
-    input_x = BatchNormalization()(input_x)
-    return input_x
 
 def NVIDIA_net():
-    input = Input(shape = (160, 320, 3))
-    x = Lambda(lambda x: x/255.0 - 0.5)(input)
-    x = Cropping2D(cropping=((70, 25), (0, 0)))(x)
-    x = conv2d_BN(x, 24, 5, 5, strides=(2, 2))
-    x = conv2d_BN(x, 36, 5, 5, strides=(2, 2))
-    x = conv2d_BN(x, 48, 5, 5, strides=(2, 2))
-    x = conv2d_BN(x, 64, 3, 3)
-    x = conv2d_BN(x, 64, 3, 3)
-    x = Flatten(name='flatten')(x)
-    x = Dropout(0.5)(x)
-    x = Dense(100)(x)
-    x = Dense(50)(x)
-    x = Dense(10)(x)
-    x = Dense(1)(x)
-    return Model(input, x)
+    """
+    Create the model from Nvida
+    :return: model
+    """
+    model = Sequential()
+    model.add(Lambda(lambda x: (x / 255.0) - 0.5, input_shape=(160, 320, 3)))
+    model.add(Cropping2D(cropping=((50, 20), (0, 0))))
+    model.add(Convolution2D(24, 5, 5, subsample=(2, 2), activation='relu'))
+    model.add(Convolution2D(36, 5, 5, subsample=(2, 2), activation='relu'))
+    model.add(Convolution2D(48, 5, 5, subsample=(2, 2), activation='relu'))
+    model.add(Convolution2D(64, 3, 3, activation='relu'))
+    model.add(Convolution2D(64, 3, 3, activation='relu'))
+    model.add(Flatten())
+    model.add(Dense(100))
+    model.add(Dense(50))
+    model.add(Dense(10))
+    model.add(Dense(1))
+    return model
 
 def NVIDIATrain():
     """Test the "End to End Learning for Self-Driving Cars" by NVIDIA
      http://images.nvidia.com/content/tegra/automotive/images/2016/solutions/pdf/end-to-end-dl-using-px.pdf
      """
-    # 80% of the data will be used for training.
-    X_train, X_valid = train_test_split(lines, test_size = 0.2)
+
+    datapath = './data/'
+    lines = getLines(datapath)
+    images_paths, angles = getPathAngle(lines, datapath, correction=0.2)
+    flips = []
+    images_paths, angles, flips = flipImages(images_paths, angles)
+    # 80% of the data will be used for training
+    datas = list(zip(images_paths, angles, flips))
+    X_train, X_valid = train_test_split(datas, test_size = 0.2)
+
     print( 'Length of X_train: ',len( X_train ) )
     print( 'Length of X_valid: ',len( X_valid ) )
     # compile and train the model using the generator function
-    train_generator = generator(X_train)
-    validation_generator = generator(X_valid)
+    train_generator = generator(X_train, batch_size=128)
+    validation_generator = generator(X_valid, batch_size=128)
 
     # Nvidia Network
     model = NVIDIA_net()
@@ -153,7 +220,7 @@ def NVIDIATrain():
     history_object = model.fit_generator(train_generator, samples_per_epoch=len(X_train),
                         validation_data = validation_generator,
                         nb_val_samples = len(X_valid),
-                        nb_epoch = 3)
+                        nb_epoch = 2)
     model.save('model.h5')
     ### print the keys contained in the history object
     print(history_object.history.keys())
